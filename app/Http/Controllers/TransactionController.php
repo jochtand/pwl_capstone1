@@ -7,6 +7,8 @@ use App\Models\TicketCategory;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Mail\TicketMail;
+use Illuminate\Support\Facades\Mail;
 
 class TransactionController extends Controller
 {
@@ -122,6 +124,7 @@ class TransactionController extends Controller
         return back()->with('success', '✅ AKSES DIBERIKAN! Tiket Valid untuk event: ' . $transaction->ticketCategory->event->title);
     }
     // Mencetak E-Ticket ke PDF
+    // Mencetak E-Ticket ke PDF
     public function downloadPDF($id)
     {
         $transaction = Transaction::with('ticketCategory.event')->where('id', $id)->where('user_id', Auth::id())->firstOrFail();
@@ -140,10 +143,13 @@ class TransactionController extends Controller
             $qrImage = null; // Backup jika gagal download
         }
 
+        Mail::to(Auth::user()->email)->send(new TicketMail($transaction, $qrImage));
+
+        // Render PDF-nya
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket', compact('transaction', 'qrImage'))
             ->setPaper('a4', 'portrait')
             ->setOption(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
 
-        return $pdf->download('E-Ticket_TRX-' . $transaction->id . '.pdf');
+        return $pdf->download('E-Ticket_PwlCapstone1_TRX-' . $transaction->id . '.pdf');
     }
 }
