@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Mail\TicketMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Http; // Tambahan untuk mengatasi error 403 QR Code
 
 class TransactionController extends Controller
 {
@@ -123,33 +124,66 @@ class TransactionController extends Controller
 
         return back()->with('success', '✅ AKSES DIBERIKAN! Tiket Valid untuk event: ' . $transaction->ticketCategory->event->title);
     }
-    // Mencetak E-Ticket ke PDF
+
     // Mencetak E-Ticket ke PDF
     public function downloadPDF($id)
     {
+
+        set_time_limit(120);
+
         $transaction = Transaction::with('ticketCategory.event')->where('id', $id)->where('user_id', Auth::id())->firstOrFail();
 
         if ($transaction->payment_status !== 'paid') {
             abort(403);
         }
 
-        // Download qr dan diubah ke base64
-        $url = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TIKETAPP-TRX-" . $transaction->id . "-USER-" . Auth::id();
+        $url = "https://quickchart.io/qr?text=TIKETAPP-TRX-" . $transaction->id . "-USER-" . Auth::id() . "&size=150";
 
         try {
-            $qrImageData = base64_encode(file_get_contents($url));
-            $qrImage = 'data:image/png;base64,' . $qrImageData;
+            $response = Http::withoutVerifying()->withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ])->get($url);
+
+            if ($response->successful()) {
+                $qrImageData = base64_encode($response->body());
+                $qrImage = 'data:image/png;base64,' . $qrImageData;
+            } else {
+                $qrImage = null;
+            }
         } catch (\Exception $e) {
-            $qrImage = null; // Backup jika gagal download
+            // Jika masuk ke sini, artinya request API gagal
+            $qrImage = null;
         }
 
+        // Mengirim email langsung ke alamat email pengguna yang login
         Mail::to(Auth::user()->email)->send(new TicketMail($transaction, $qrImage));
 
-        // Render PDF-nya
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket', compact('transaction', 'qrImage'))
+        // Merender tampilan PDF
+        $pdf = Pdf::loadView('pdf.ticket', compact('transaction', 'qrImage'))
             ->setPaper('a4', 'portrait')
             ->setOption(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
 
-        return $pdf->download('E-Ticket_PwlCapstone1_TRX-' . $transaction->id . '.pdf');
+        return $pdf->download('E-Ticket_TiketApp_TRX-' . $transaction->id . '.pdf');
+    }
+    // Export Laporan Penjualan untuk Panitia
+    public function exportReport()
+    {
+        $user = Auth::user();
+
+        // Ambil semua transaksi lunas untuk event milik panitia ini
+        $transactions = Transaction::with(['ticketCategory.event', 'user'])
+            ->where('payment_status', 'paid')
+            ->whereHas('ticketCategory.event', function ($query) use ($user) {
+                $query->where('organizer_id', $user->id);
+            })
+            ->latest()
+            ->get();
+
+        $totalRevenue = $transactions->sum('total_price');
+
+        $pdf = Pdf::loadView('pdf.report', compact('transactions', 'totalRevenue'))
+            ->setPaper('a4', 'landscape'); // Pakai landscape biar tabelnya lega
+
+        return $pdf->download('Laporan_Penjualan_TiketApp_' . date('Ymd') . '.pdf');
     }
 }

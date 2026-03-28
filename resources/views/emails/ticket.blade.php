@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TiketApp</title>
+    <title>E-Ticket Kamu Sudah Siap!</title>
 </head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-<h2>Halo, {{ Auth::user()->name }}! 👋</h2>
-<p>Terima kasih udah beli tiket event <strong>{{ $transaction->ticketCategory->event->title }}</strong> lewat TiketApp.</p>
+<body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+<h2>Halo!</h2>
+<p>Terima kasih sudah memesan tiket untuk event <strong>{{ $transaction->ticketCategory->event->title }}</strong>.</p>
 
-<p>Pembayaran kamu udah divalidasi dan lunas. E-Ticket resmi kamu udah diselipin di *attachment* email ini ya!</p>
+<p>Pembayaran kamu sudah berhasil diverifikasi. Bersama email ini, kami melampirkan E-Ticket kamu dalam format PDF.</p>
 
-<p>Silakan download file PDF-nya dan siapkan QR Code-nya saat proses validasi di lokasi.</p>
+<p>Mohon unduh lampiran PDF tersebut dan tunjukkan QR Code di dalamnya kepada panitia (bisa di-print atau langsung dari HP) saat acara berlangsung.</p>
 
 <br>
-<p>Salam hangat,<br>
-    <strong>Tim TiketApp</strong></p>
+<p>Sampai jumpa di lokasi!</p>
+<p><strong>Tim Panitia</strong></p>
 </body>
 </html>

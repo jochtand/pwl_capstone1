@@ -30,7 +30,14 @@ class TicketMail extends Mailable
         );
     }
 
-    // ... bagian attachments ...
+    // Fungsi ini yang sebelumnya hilang
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.ticket', // Memanggil file resources/views/emails/ticket.blade.php
+        );
+    }
+
     public function attachments(): array
     {
         $pdf = Pdf::loadView('pdf.ticket', [

@@ -10,9 +10,6 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-2xl border border-gray-100">
                 <div class="p-8 text-gray-900">
 
-                    <!-- ========================================== -->
-                    <!-- Notifikasi error sama sukses
-                    <!-- ========================================== -->
                     @if(session('success'))
                         <div class="mb-8 bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl shadow-sm flex items-center">
                             <span class="text-emerald-500 text-2xl mr-3">✅</span>
@@ -26,17 +23,31 @@
                             <p class="text-red-800 font-semibold tracking-wide">{{ session('error') }}</p>
                         </div>
                     @endif
-                    <!-- ========================================== -->
 
-                    <!-- Hanya panitia yang bisa liat-->
                     @if(Auth::user()->role === 'organizer')
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+                        @php
+                            // Logika untuk menyiapkan data Chart.js
+                            $chartLabels = [];
+                            $chartData = [];
+                            foreach($events as $event) {
+                                $chartLabels[] = $event->title;
+                                // Hitung jumlah tiket lunas per event
+                                $terjual = $transactions->where('payment_status', 'paid')
+                                                        ->filter(function($trx) use ($event) {
+                                                            return $trx->ticketCategory->event_id == $event->id;
+                                                        })->count();
+                                $chartData[] = $terjual;
+                            }
+                        @endphp
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
 
                             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-indigo-500 hover:shadow-md transition">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Event Aktif</h3>
-                                        <p class="text-3xl font-black text-gray-900">{{ $totalEvents }}<span class="text-sm font-medium text-gray-400 normal-case">Event</span></p>
+                                        <p class="text-3xl font-black text-gray-900">{{ $totalEvents }} <span class="text-sm font-medium text-gray-400 normal-case">Event</span></p>
                                     </div>
                                     <div class="bg-indigo-50 p-3 rounded-lg text-indigo-500 text-2xl">📅</div>
                                 </div>
@@ -64,6 +75,23 @@
 
                         </div>
 
+                        <div class="mb-8 flex justify-end">
+                            <a href="{{ route('report.export') }}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-lg text-sm shadow-md transition flex items-center gap-2">
+                                📄 Download Laporan Penjualan (PDF)
+                            </a>
+                        </div>
+
+                        @if(count($chartLabels) > 0)
+                            <div class="mb-10 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                                    <span class="mr-2">📊</span> Grafik Penjualan Tiket per Event
+                                </h3>
+                                <div class="relative w-full" style="height: 300px;">
+                                    <canvas id="salesChart"></canvas>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="border-t border-gray-100 my-8"></div>
 
                         @if($pendingTransactions->count() > 0)
@@ -87,19 +115,14 @@
                                                 <td class="p-3 font-mono text-sm text-gray-600">#TRX-{{ str_pad($trx->id, 5, '0', STR_PAD_LEFT) }}</td>
                                                 <td class="p-3 font-medium text-gray-800">{{ $trx->ticketCategory->event->title }}</td>
                                                 <td class="p-3 font-bold text-emerald-600">Rp {{ number_format($trx->total_price, 0, ',', '.') }}</td>
-
-                                                <!-- PERUBAHAN DI SINI: DUA TOMBOL AKSI -->
                                                 <td class="p-3 text-center">
                                                     <div class="flex items-center justify-center space-x-2">
-                                                        <!-- Tombol Terima -->
                                                         <form action="{{ route('transactions.approve', $trx->id) }}" method="POST">
                                                             @csrf
                                                             <button type="submit" class="bg-emerald-500 text-white px-3 py-1.5 rounded-md text-sm font-bold hover:bg-emerald-600 transition shadow-sm">
                                                                 ✅ Terima
                                                             </button>
                                                         </form>
-
-                                                        <!-- Tombol Tolak -->
                                                         <form action="{{ route('transactions.reject', $trx->id) }}" method="POST" onsubmit="return confirm('Tolak pembayaran dan kembalikan kuota tiket ini ke sistem?');">
                                                             @csrf
                                                             <button type="submit" class="bg-red-500 text-white px-3 py-1.5 rounded-md text-sm font-bold hover:bg-red-600 transition shadow-sm">
@@ -108,7 +131,6 @@
                                                         </form>
                                                     </div>
                                                 </td>
-
                                             </tr>
                                         @endforeach
                                         </tbody>
@@ -174,7 +196,6 @@
                             </table>
                         </div>
 
-                        <!-- Jika yang login user biasa -->
                     @elseif(Auth::user()->role === 'user')
                         <div class="text-center py-16">
                             <span class="text-6xl block mb-6">👋</span>
@@ -190,4 +211,57 @@
             </div>
         </div>
     </div>
+
+    @if(Auth::user()->role === 'organizer')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const canvas = document.getElementById('salesChart');
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: {!! json_encode($chartLabels ?? []) !!},
+                            datasets: [{
+                                label: 'Total Tiket Terjual',
+                                data: {!! json_encode($chartData ?? []) !!},
+                                backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                                borderColor: 'rgba(99, 102, 241, 1)',
+                                borderWidth: 2,
+                                borderRadius: 6,
+                                hoverBackgroundColor: 'rgba(99, 102, 241, 0.4)'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1,
+                                        precision: 0
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.raw + ' Tiket';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        </script>
+    @endif
+
 </x-app-layout>

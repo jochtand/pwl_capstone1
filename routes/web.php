@@ -78,7 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // Yang butuh validasi adalah yang statusnya 'verifying'
             $pendingTransactions = $transactions->where('payment_status', 'verifying');
 
-            return view('dashboard', compact('events', 'totalEvents', 'totalTickets', 'totalRevenue', 'pendingTransactions'));
+            return view('dashboard', compact('events', 'totalEvents', 'totalTickets', 'totalRevenue', 'pendingTransactions', 'transactions'));
         }
 
         // 3. Jika User Biasa, tampilkan dashboard biasa
@@ -94,6 +94,7 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     Route::get('/events/{event}/edit', [EventController::class, 'edit'])->name('events.edit');
     Route::put('/events/{event}', [EventController::class, 'update'])->name('events.update');
     Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
+    Route::get('/export-report', [TransactionController::class, 'exportReport'])->name('report.export');
 
     // Rute Kelola Kategori Tiket
     Route::get('/events/{event}/tickets', [TicketController::class, 'index'])->name('tickets.index');
@@ -110,11 +111,14 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     Route::delete('/categories/{id}', [EventController::class, 'categoriesDestroy'])->name('categories.destroy');
 });
 
-// Super Admin
+// ==========================================
+// SUPER ADMIN (CRUD USER)
+// ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/users', [AdminController::class, 'index'])->name('admin.users');
-    Route::put('/admin/users/{id}/role', [AdminController::class, 'updateRole'])->name('admin.users.updateRole');
-    Route::delete('/admin/users/{id}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
+    Route::post('/admin/users', [AdminController::class, 'store'])->name('admin.users.store'); // Tambah User
+    Route::put('/admin/users/{id}', [AdminController::class, 'update'])->name('admin.users.update'); // Update Nama, Email, Role
+    Route::delete('/admin/users/{id}', [AdminController::class, 'destroy'])->name('admin.users.destroy'); // Hapus User
 });
 
 require __DIR__.'/auth.php';
