@@ -9,6 +9,19 @@
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white shadow-sm sm:rounded-lg p-8">
 
+                @if(session('warning'))
+                    <div class="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm flex items-center">
+                        <span class="text-amber-500 text-2xl mr-3">⚠️</span>
+                        <p class="text-amber-800 font-bold tracking-wide">{{ session('warning') }}</p>
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm flex items-center">
+                        <span class="text-red-500 text-2xl mr-3">🚨</span>
+                        <p class="text-red-800 font-bold tracking-wide">{{ session('error') }}</p>
+                    </div>
+                @endif
                 <h3 class="text-2xl font-bold mb-6 border-b pb-4">Ringkasan Pesanan</h3>
 
                 <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-6">

@@ -50,7 +50,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // ==========================================
-// DASHBOARD (Pintu Masuk Utama Setelah Login)
+// DASHBOARD (Pintu Masuk Setelah Login)
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
@@ -60,7 +60,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if ($user->role === 'admin') {
             return redirect()->route('admin.users');
         }
-
         // 2. Jika Panitia, tampilkan analitik
         if ($user->role === 'organizer') {
             $events = Event::where('organizer_id', $user->id)->latest()->get();
@@ -74,19 +73,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // Hanya hitung tiket dan pendapatan yang statusnya SUDAH LUNAS ('paid')
             $totalTickets = $transactions->where('payment_status', 'paid')->count();
             $totalRevenue = $transactions->where('payment_status', 'paid')->sum('total_price');
-
             // Yang butuh validasi adalah yang statusnya 'verifying'
             $pendingTransactions = $transactions->where('payment_status', 'verifying');
-
+            // Variabel $transactions sudah dipassing ke view
             return view('dashboard', compact('events', 'totalEvents', 'totalTickets', 'totalRevenue', 'pendingTransactions', 'transactions'));
         }
-
         // 3. Jika User Biasa, tampilkan dashboard biasa
         return view('dashboard');
     })->name('dashboard');
 });
 
-// Bagian Organizer
+// ==========================================
+// BAGIAN ORGANIZER (Panitia)
+// ==========================================
 Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     // Rute Kelola Event
     Route::get('/events/create', [EventController::class, 'create'])->name('events.create');
@@ -94,7 +93,6 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     Route::get('/events/{event}/edit', [EventController::class, 'edit'])->name('events.edit');
     Route::put('/events/{event}', [EventController::class, 'update'])->name('events.update');
     Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
-    Route::get('/export-report', [TransactionController::class, 'exportReport'])->name('report.export');
 
     // Rute Kelola Kategori Tiket
     Route::get('/events/{event}/tickets', [TicketController::class, 'index'])->name('tickets.index');
@@ -109,6 +107,9 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     Route::get('/categories', [EventController::class, 'categoriesIndex'])->name('categories.index');
     Route::post('/categories', [EventController::class, 'categoriesStore'])->name('categories.store');
     Route::delete('/categories/{id}', [EventController::class, 'categoriesDestroy'])->name('categories.destroy');
+
+    // RUTE BARU: Export Laporan Penjualan
+    Route::get('/export-report', [TransactionController::class, 'exportReport'])->name('report.export');
 });
 
 // ==========================================
@@ -116,9 +117,9 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/users', [AdminController::class, 'index'])->name('admin.users');
-    Route::post('/admin/users', [AdminController::class, 'store'])->name('admin.users.store'); // Tambah User
-    Route::put('/admin/users/{id}', [AdminController::class, 'update'])->name('admin.users.update'); // Update Nama, Email, Role
-    Route::delete('/admin/users/{id}', [AdminController::class, 'destroy'])->name('admin.users.destroy'); // Hapus User
+    Route::post('/admin/users', [AdminController::class, 'store'])->name('admin.users.store');
+    Route::put('/admin/users/{id}', [AdminController::class, 'update'])->name('admin.users.update');
+    Route::delete('/admin/users/{id}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
 });
 
 require __DIR__.'/auth.php';

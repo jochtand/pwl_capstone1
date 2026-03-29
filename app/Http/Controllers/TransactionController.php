@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Mail\TicketMail;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Http; // Tambahan untuk mengatasi error 403 QR Code
+use Illuminate\Support\Facades\Http;
+use App\Models\WaitingList;
 
 class TransactionController extends Controller
 {
@@ -20,15 +21,33 @@ class TransactionController extends Controller
         return view('checkout.index', compact('ticket'));
     }
 
-    // Memproses pembelian tiket (Booking)
+    // Memproses pembelian tiket (Booking) & Logika Waiting List
     public function store(Request $request, $ticketId)
     {
         $ticket = TicketCategory::findOrFail($ticketId);
 
+        // Jika tiket habis, masukkan ke Waiting List
         if ($ticket->quota < 1) {
-            return back()->with('error', 'Maaf, kuota tiket ini sudah habis!');
+            // Cek apakah user sudah ada di antrean biar gak double
+            $alreadyWaiting = WaitingList::where('user_id', Auth::id())
+                ->where('ticket_category_id', $ticket->id)
+                ->exists();
+
+            if ($alreadyWaiting) {
+                return back()->with('error', 'Maaf, Anda sudah berada di dalam daftar antrean tiket ini.');
+            }
+
+            // Masukkan ke database antrean
+            WaitingList::create([
+                'user_id' => Auth::id(),
+                'ticket_category_id' => $ticket->id,
+                'event_id' => $ticket->event_id,
+            ]);
+
+            return back()->with('warning', 'Kuota habis! Anda telah dimasukkan ke dalam Waiting List. Kami akan mengalihkan tiket otomatis jika ada pembeli yang batal.');
         }
 
+        // Jika kuota masih ada, proses normal
         Transaction::create([
             'user_id' => Auth::id(),
             'ticket_category_id' => $ticket->id,
@@ -69,20 +88,37 @@ class TransactionController extends Controller
         return back()->with('success', 'Pembayaran berhasil divalidasi! Tiket user sudah aktif.');
     }
 
-    // 3. Panitia klik "Tolak Pembayaran"
+    // 3. Panitia klik "Tolak Pembayaran" & Oper tiket ke antrean
     public function reject($id)
     {
         $transaction = Transaction::findOrFail($id);
+        $ticket = $transaction->ticketCategory;
 
-        // Ubah status jadi gagal
+        // Ubah status transaksi awal jadi gagal
         $transaction->update(['payment_status' => 'failed']);
 
-        // KEMBALIKAN KUOTA TIKET KARENA BATAL!
-        $ticket = $transaction->ticketCategory;
-        $ticket->quota += 1;
-        $ticket->save();
+        // CEK WAITING LIST: Cari 1 orang yang paling lama ngantre (oldest)
+        $nextInLine = WaitingList::where('ticket_category_id', $ticket->id)->oldest()->first();
 
-        return back()->with('success', 'Pembayaran ditolak! Kuota tiket telah dikembalikan ke sistem.');
+        if ($nextInLine) {
+            // ADA ANTREAN! Otomatis buatkan transaksi untuk orang ini
+            Transaction::create([
+                'user_id' => $nextInLine->user_id,
+                'ticket_category_id' => $ticket->id,
+                'total_price' => $ticket->price,
+            ]);
+
+            // Hapus orang tersebut dari daftar antrean karena sudah dapat tiket
+            $nextInLine->delete();
+
+            return back()->with('success', 'Pembayaran ditolak! Tiket langsung dialihkan secara otomatis ke antrean pertama di Waiting List.');
+        } else {
+            // TIDAK ADA ANTREAN. Kembalikan kuota tiket ke publik seperti biasa
+            $ticket->quota += 1;
+            $ticket->save();
+
+            return back()->with('success', 'Pembayaran ditolak! Kuota tiket telah dikembalikan ke sistem.');
+        }
     }
 
     // Menampilkan halaman Scanner
