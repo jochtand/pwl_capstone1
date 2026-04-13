@@ -25,4 +25,9 @@ class Event extends Model
     {
         return $this->hasMany(TicketCategory::class);
     }
+    // Relasi ke User (Panitia)
+    public function organizer()
+    {
+        return $this->belongsTo(User::class, 'organizer_id');
+    }
 }

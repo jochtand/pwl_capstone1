@@ -15,6 +15,7 @@ class Transaction extends Model
         'total_price',
         'payment_status',
         'ticket_status',
+        'payment_proof',
     ];
 
     // Relasi: Transaksi ini milik siapa?

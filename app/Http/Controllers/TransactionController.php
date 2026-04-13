@@ -72,12 +72,32 @@ class TransactionController extends Controller
         return view('my-tickets', compact('transactions'));
     }
 
-    // 1. User klik "Sudah Bayar"
-    public function pay($id)
+    // 1. User upload bukti dan klik "Kirim Bukti Pembayaran"
+    public function pay(Request $request, $id)
     {
+        // Validasi file yang diupload (wajib gambar, max 2MB)
+        $request->validate([
+            'payment_proof' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
         $transaction = Transaction::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
-        $transaction->update(['payment_status' => 'verifying']);
-        return back()->with('success', 'Konfirmasi terkirim! Menunggu validasi dari panitia.');
+
+        // Proses penyimpanan gambar (JALAN PINTAS ANTI 403 FORBIDDEN)
+        if ($request->hasFile('payment_proof')) {
+            $file = $request->file('payment_proof');
+            $filename = time() . '_' . $file->getClientOriginalName();
+
+            // Simpan LANGSUNG ke folder public/payment_proofs (Tidak perlu storage:link)
+            $file->move(public_path('payment_proofs'), $filename);
+
+            // Update database
+            $transaction->update([
+                'payment_status' => 'verifying',
+                'payment_proof' => $filename
+            ]);
+        }
+
+        return back()->with('success', 'Bukti pembayaran berhasil terkirim! Menunggu validasi dari panitia.');
     }
 
     // 2. Panitia klik "Terima Pembayaran"
@@ -221,5 +241,75 @@ class TransactionController extends Controller
             ->setPaper('a4', 'landscape'); // Pakai landscape biar tabelnya lega
 
         return $pdf->download('Laporan_Penjualan_TiketApp_' . date('Ymd') . '.pdf');
+    }
+    // ==========================================
+    // Tiket Kadaluarsa
+    // ==========================================
+    public function clearExpiredTickets()
+    {
+        $user = Auth::user();
+
+        // 1. Ambil semua transaksi yang statusnya 'pending' (Belum Dibayar) untuk event milik panitia ini
+        $transactions = Transaction::with('ticketCategory')
+            ->whereHas('ticketCategory.event', function ($query) use ($user) {
+                $query->where('organizer_id', $user->id);
+            })
+            ->where('payment_status', 'pending')
+            ->get();
+
+        $expiredCount = 0;
+        $shiftedCount = 0;
+
+        foreach ($transactions as $transaction) {
+            $isExpired = false;
+
+            // Aturan 1: TIKET VIP/MAHAL (Harga >= 300.000) -> Kedaluwarsa dalam 1 Jam
+            if ($transaction->total_price >= 300000) {
+                // TIPS DEMO: Ubah diffInHours jadi diffInMinutes saat presentasi besok agar cepat batal
+                if ($transaction->created_at->diffInMinutes(now()) >= 1) {
+                    $isExpired = true;
+                }
+            }
+            // Aturan 2: TIKET STANDARD (Harga < 300.000) -> Kedaluwarsa dalam 24 Jam
+            else {
+                if ($transaction->created_at->diffInHours(now()) >= 24) {
+                    $isExpired = true;
+                }
+            }
+
+            // Jika terbukti kedaluwarsa, lakukan Eksekusi!
+            if ($isExpired) {
+                // 1. Batalkan pesanan si pengantre palsu
+                $transaction->update(['payment_status' => 'failed']);
+                $expiredCount++;
+
+                $ticket = $transaction->ticketCategory;
+
+                // 2. Cek apakah ada pahlawan kesiangan di Waiting List
+                $nextInLine = WaitingList::where('ticket_category_id', $ticket->id)->oldest()->first();
+
+                if ($nextInLine) {
+                    // ADA ANTREAN! Buatkan transaksi baru untuk orang pertama di antrean
+                    Transaction::create([
+                        'user_id' => $nextInLine->user_id,
+                        'ticket_category_id' => $ticket->id,
+                        'total_price' => $ticket->price,
+                        'payment_status' => 'pending',
+                    ]);
+                    // Hapus orang tersebut dari daftar antrean
+                    $nextInLine->delete();
+                    $shiftedCount++;
+                } else {
+                    // TIDAK ADA ANTREAN. Kembalikan stok kuota tiket ke publik
+                    $ticket->increment('stock');
+                }
+            }
+        }
+
+        if ($expiredCount > 0) {
+            return back()->with('success', "🧹 Sapu Bersih Selesai! $expiredCount tiket kadaluarsa dibatalkan. $shiftedCount tiket otomatis dialihkan ke antrean Waiting List.");
+        } else {
+            return back()->with('success', "✅ Sistem aman. Tidak ada pesanan tiket yang melewati batas waktu saat ini.");
+        }
     }
 }

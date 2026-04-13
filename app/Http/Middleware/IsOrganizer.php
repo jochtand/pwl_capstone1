@@ -12,15 +12,13 @@ class IsOrganizer
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next)
     {
-        // Cek apakah user sudah login dan rolenya adalah 'organizer'
-        if (Auth::check() && Auth::user()->role === 'organizer') {
-            // Kalau dia organizer, silakan lewat!
+        // Beri izin jika user adalah Panitia (organizer) ATAU Super Admin (admin)
+        if (Auth::check() && (Auth::user()->role === 'organizer' || Auth::user()->role === 'admin')) {
             return $next($request);
         }
 
-        // Kalau user biasa (pembeli), bawa kembali ke halaman utama web
-        return redirect('/');
+        return redirect('/')->with('error', 'Anda tidak memiliki akses ke halaman ini.');
     }
 }

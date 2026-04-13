@@ -47,6 +47,11 @@ Route::middleware('auth')->group(function () {
     // Rute Panitia Validasi Pembayaran
     Route::post('/transactions/{id}/approve', [TransactionController::class, 'approve'])->name('transactions.approve');
     Route::post('/transactions/{id}/reject', [TransactionController::class, 'reject'])->name('transactions.reject');
+
+    // ==========================================
+    // FINAL BOSS: RUTE SAPU BERSIH TIKET KADALUARSA
+    // ==========================================
+    Route::post('/transactions/clear-expired', [TransactionController::class, 'clearExpiredTickets'])->name('transactions.clearExpired');
 });
 
 // ==========================================
@@ -54,35 +59,61 @@ Route::middleware('auth')->group(function () {
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
-        $user = Auth::user();
+        $user = \Illuminate\Support\Facades\Auth::user();
 
-        // 1. Jika Super Admin, langsung masuk
+        // JIKA ADMIN: Lempar ke Kelola Pengguna
         if ($user->role === 'admin') {
             return redirect()->route('admin.users');
         }
-        // 2. Jika Panitia, tampilkan analitik
+
+        // JIKA PANITIA: Tampilkan Dashboard Analitik
         if ($user->role === 'organizer') {
-            $events = Event::where('organizer_id', $user->id)->latest()->get();
+            $events = \App\Models\Event::where('organizer_id', $user->id)->get();
             $totalEvents = $events->count();
 
-            // Mengambil semua transaksi untuk event milik panitia ini
-            $transactions = Transaction::whereHas('ticketCategory.event', function ($query) use ($user) {
-                $query->where('organizer_id', $user->id);
-            })->get();
+            $transactions = \App\Models\Transaction::with('ticketCategory.event')
+                ->whereHas('ticketCategory.event', function ($query) use ($user) {
+                    $query->where('organizer_id', $user->id);
+                })->get();
 
-            // Hanya hitung tiket dan pendapatan yang statusnya SUDAH LUNAS ('paid')
-            $totalTickets = $transactions->where('payment_status', 'paid')->count();
-            $totalRevenue = $transactions->where('payment_status', 'paid')->sum('total_price');
-            // Yang butuh validasi adalah yang statusnya 'verifying'
+            $paidTransactions = $transactions->where('payment_status', 'paid');
             $pendingTransactions = $transactions->where('payment_status', 'verifying');
-            // Variabel $transactions sudah dipassing ke view
-            return view('dashboard', compact('events', 'totalEvents', 'totalTickets', 'totalRevenue', 'pendingTransactions', 'transactions'));
+
+            $totalTickets = $paidTransactions->count();
+            $totalRevenue = $paidTransactions->sum('total_price');
+
+            $eventAnalysis = $events->map(function ($event) use ($paidTransactions) {
+                $sales = $paidTransactions->filter(function ($trx) use ($event) {
+                    return $trx->ticketCategory->event_id == $event->id;
+                });
+                $event->tickets_sold = $sales->count();
+                $event->revenue = $sales->sum('total_price');
+                return $event;
+            })->sortByDesc('tickets_sold');
+
+            $monthlyRevenue = array_fill(1, 12, 0);
+            foreach ($paidTransactions as $trx) {
+                $month = (int)$trx->created_at->format('m');
+                $year = $trx->created_at->format('Y');
+                if ($year == date('Y')) {
+                    $monthlyRevenue[$month] += $trx->total_price;
+                }
+            }
+            $chartMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+            $chartRevenueData = array_values($monthlyRevenue);
+
+            return view('dashboard', compact(
+                'events', 'totalEvents', 'totalTickets', 'totalRevenue',
+                'pendingTransactions', 'eventAnalysis', 'chartMonths', 'chartRevenueData'
+            ));
         }
-        // 3. Jika User Biasa, tampilkan dashboard biasa
-        return view('dashboard');
+
+        // JIKA USER BIASA: Langsung Tampilkan Katalog Event
+        $events = \App\Models\Event::latest()->get();
+        return view('dashboard', compact('events'));
+
     })->name('dashboard');
 });
-
 // ==========================================
 // BAGIAN ORGANIZER (Panitia)
 // ==========================================
@@ -106,20 +137,28 @@ Route::middleware(['auth', 'verified', IsOrganizer::class])->group(function () {
     // Rute Kelola Kategori
     Route::get('/categories', [EventController::class, 'categoriesIndex'])->name('categories.index');
     Route::post('/categories', [EventController::class, 'categoriesStore'])->name('categories.store');
+    Route::put('/categories/{id}', [EventController::class, 'categoriesUpdate'])->name('categories.update');
     Route::delete('/categories/{id}', [EventController::class, 'categoriesDestroy'])->name('categories.destroy');
 
-    // RUTE BARU: Export Laporan Penjualan
+    // Rute Export Laporan Penjualan
     Route::get('/export-report', [TransactionController::class, 'exportReport'])->name('report.export');
 });
 
 // ==========================================
-// SUPER ADMIN (CRUD USER)
+// SUPER ADMIN (CRUD USER & EVENT)
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Kelola User
     Route::get('/admin/users', [AdminController::class, 'index'])->name('admin.users');
     Route::post('/admin/users', [AdminController::class, 'store'])->name('admin.users.store');
     Route::put('/admin/users/{id}', [AdminController::class, 'update'])->name('admin.users.update');
     Route::delete('/admin/users/{id}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
+
+    // Kelola Event
+    Route::get('/admin/events', [AdminController::class, 'events'])->name('admin.events');
+    Route::post('/admin/events', [AdminController::class, 'storeEvent'])->name('admin.events.store');
+    Route::put('/admin/events/{id}', [AdminController::class, 'updateEvent'])->name('admin.events.update');
+    Route::delete('/admin/events/{id}', [AdminController::class, 'destroyEvent'])->name('admin.events.destroy');
 });
 
 require __DIR__.'/auth.php';

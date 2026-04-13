@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use App\Models\Event;
 use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class EventController extends Controller
 {
@@ -32,8 +31,13 @@ class EventController extends Controller
         ]);
 
         $imagePath = null;
+
+        // JALAN PINTAS ANTI 403: Simpan gambar langsung ke folder public
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('posters', 'public');
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('event_images'), $filename);
+            $imagePath = $filename;
         }
 
         Event::create([
@@ -89,11 +93,18 @@ class EventController extends Controller
         $event = Event::findOrFail($id);
         $imagePath = $event->image;
 
+        // JALAN PINTAS ANTI 403 UNTUK FITUR EDIT
         if ($request->hasFile('image')) {
-            if ($event->image) {
-                Storage::disk('public')->delete($event->image);
+            // Hapus gambar lama dari folder public jika ada
+            if ($event->image && file_exists(public_path('event_images/' . $event->image))) {
+                unlink(public_path('event_images/' . $event->image));
             }
-            $imagePath = $request->file('image')->store('posters', 'public');
+
+            // Simpan gambar baru
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('event_images'), $filename);
+            $imagePath = $filename;
         }
 
         $event->update([
@@ -126,9 +137,9 @@ class EventController extends Controller
             return back()->with('error', '❌ DITOLAK! Event ini tidak bisa dihapus karena sudah ada transaksi.');
         }
 
-        // Menghapus gambar dari storage sebelum hapus database
-        if ($event->image) {
-            Storage::disk('public')->delete($event->image);
+        // Menghapus gambar dari folder public sebelum hapus database
+        if ($event->image && file_exists(public_path('event_images/' . $event->image))) {
+            unlink(public_path('event_images/' . $event->image));
         }
 
         $event->delete();
@@ -136,7 +147,10 @@ class EventController extends Controller
         return back()->with('success', 'Event berhasil dihapus.');
     }
 
-    // Mengelola Kategori
+    // ==========================================
+    // KELOLA KATEGORI (PANITIA & ADMIN)
+    // ==========================================
+
     public function categoriesIndex() {
         $categories = Category::all();
         return view('categories.index', compact('categories'));
@@ -152,5 +166,15 @@ class EventController extends Controller
         $category = Category::findOrFail($id);
         $category->delete();
         return back()->with('success', 'Kategori berhasil dihapus!');
+    }
+
+    // Update Kategori yang sudah ada (Dipanggil oleh Modal Pop-up)
+    public function categoriesUpdate(Request $request, $id)
+    {
+        $request->validate(['name' => 'required|string|max:255']);
+        $category = \App\Models\Category::findOrFail($id);
+        $category->update(['name' => $request->name]);
+
+        return back()->with('success', 'Kategori berhasil diperbarui!');
     }
 }

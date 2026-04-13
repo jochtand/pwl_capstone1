@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            📷 Simulasi Scanner Tiket
+            📷 Scan Tiket
         </h2>
     </x-slot>
 
@@ -31,19 +31,23 @@
 
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-2xl border border-gray-200">
                 <div class="p-10 text-center">
-                    <div class="text-6xl mb-6">🔍</div>
-                    <h3 class="text-3xl font-black text-gray-900 mb-2">Pintu Masuk Venue</h3>
-                    <p class="text-gray-500 mb-8 font-medium">Masukkan ID Pesanan (Contoh: #TRX-00004 atau ketik angka 4) untuk memvalidasi tiket pengunjung.</p>
+                    <div class="text-6xl mb-6">📷</div>
+                    <h3 class="text-3xl font-black text-gray-900 mb-2">Scan QR Code E-Ticket</h3>
+                    <p class="text-gray-500 mb-8 font-medium">Arahkan kamera ke QR Code pada E-Ticket pengunjung.</p>
 
-                    <form action="{{ route('scan.process') }}" method="POST" class="max-w-md mx-auto">
+                    <div class="flex justify-center mb-8">
+                        <div id="qr-reader" class="w-full max-w-md rounded-2xl overflow-hidden border-4 border-indigo-100 shadow-inner"></div>
+                    </div>
+
+                    <form id="scan-form" action="{{ route('scan.process') }}" method="POST" class="max-w-md mx-auto border-t border-dashed border-gray-300 pt-8">
                         @csrf
-                        <div class="mb-6">
-                            <input type="text" name="ticket_id" required autofocus autocomplete="off" placeholder="Ketik ID Pesanan di sini..." class="w-full text-center text-2xl font-mono font-bold py-4 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl shadow-inner bg-gray-50">
+                        <p class="text-xs text-gray-400 font-bold mb-3 uppercase tracking-widest">Atau ketik ID manual</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="ticket_id" name="ticket_id" required autocomplete="off" placeholder="Contoh: 4 atau #TRX-00004" class="w-full text-center text-lg font-mono font-bold py-3 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl shadow-sm bg-gray-50">
+                            <button type="submit" class="bg-gray-900 text-white font-black px-6 rounded-xl shadow-md hover:bg-gray-800 transition">
+                                CEK
+                            </button>
                         </div>
-
-                        <button type="submit" class="w-full bg-gray-900 text-white font-black text-xl py-4 rounded-xl shadow-lg hover:bg-gray-800 transition transform hover:scale-105 active:scale-95 duration-200">
-                            CEK TIKET SEKARANG
-                        </button>
                     </form>
                 </div>
             </div>
@@ -54,4 +58,47 @@
 
         </div>
     </div>
+
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inisialisasi Scanner
+            const html5QrCode = new Html5Qrcode("qr-reader");
+
+            // Fungsi yang dijalankan ketika QR Code sukses terbaca
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                // 1. Bunyikan suara 'BEEP' kecil (opsional tapi bikin keren)
+                let audio = new Audio('https://www.soundjay.com/buttons/sounds/beep-07a.mp3');
+                audio.play();
+
+                // 2. Matikan kamera sementara biar ga nge-scan berkali-kali
+                html5QrCode.stop().then((ignore) => {
+
+                    // 3. Ekstrak ID dari Teks QR (Format asli: TIKETAPP-TRX-1-USER-1)
+                    let ticketId = decodedText;
+                    const match = decodedText.match(/TRX-(\d+)/);
+                    if(match && match[1]) {
+                        ticketId = match[1]; // Mengambil angka aslinya saja
+                    }
+
+                    // 4. Masukkan ke input teks dan Submit Form Otomatis!
+                    document.getElementById('ticket_id').value = ticketId;
+                    document.getElementById('scan-form').submit();
+
+                }).catch((err) => {
+                    console.log("Gagal menghentikan scanner: ", err);
+                });
+            };
+
+            // Konfigurasi Kamera (Kotak scan 250x250)
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            // Nyalakan Kamera Belakang (environment)
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch((err) => {
+                    console.log("Error starting camera:", err);
+                    document.getElementById('qr-reader').innerHTML = '<div class="bg-red-50 p-6 text-red-500 font-medium">Kamera tidak dapat diakses.<br>Pastikan Anda memberikan izin akses kamera (Allow Camera) di browser Anda.</div>';
+                });
+        });
+    </script>
 </x-app-layout>

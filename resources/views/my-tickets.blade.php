@@ -39,10 +39,15 @@
                                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=QRIS-DUMMY-PAYMENT" alt="QRIS" class="w-20 h-20 opacity-80">
                                     </div>
 
-                                    <form action="{{ route('tickets.pay', $transaction->id) }}" method="POST">
+                                    <form action="{{ route('tickets.pay', $transaction->id) }}" method="POST" enctype="multipart/form-data" class="mt-4">
                                         @csrf
-                                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm hover:bg-indigo-700 transition text-sm">
-                                            Kirim Konfirmasi Bayar
+                                        <div class="mb-3">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Upload Bukti Transfer</label>
+                                            <input type="file" name="payment_proof" required accept="image/*"
+                                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-md">
+                                        </div>
+                                        <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition shadow-sm">
+                                            📤 Kirim Bukti Pembayaran
                                         </button>
                                     </form>
                                 </div>
@@ -54,7 +59,6 @@
                                     <p class="text-sm text-gray-600 font-medium leading-relaxed">Panitia sedang mengecek pembayaran Anda. Mohon tunggu sebentar.</p>
                                 </div>
 
-                                <!-- JIKA DITOLAK (FAILED) -->
                             @elseif($transaction->payment_status === 'failed')
                                 <div class="text-center w-full py-8">
                                     <div class="text-4xl mb-3">❌</div>
@@ -62,7 +66,6 @@
                                     <p class="text-sm text-gray-600 font-medium leading-relaxed">Bukti pembayaran Anda ditolak oleh panitia atau waktu pembayaran habis.</p>
                                 </div>
 
-                                <!-- JIKA LUNAS (PAID) -->
                             @elseif($transaction->payment_status === 'paid')
                                 <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">Lunas - Tiket Valid</span>
                                 <div class="p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -70,7 +73,6 @@
                                 </div>
                                 <p class="text-[11px] text-center mt-4 mb-3 text-gray-500 font-medium leading-relaxed">Tunjukkan QR Code ini<br>di pintu masuk venue.</p>
 
-                                <!-- TOMBOL DOWNLOAD PDF -->
                                 <a href="{{ route('tickets.download', $transaction->id) }}" class="mt-2 flex items-center justify-center w-full bg-gray-900 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-indigo-600 transition text-xs uppercase tracking-widest">
                                     📥 Download PDF
                                 </a>

@@ -2,38 +2,57 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
+
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ url('/') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-indigo-600" />
+                    <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
+                        <div class="bg-indigo-600 text-white p-2 rounded-xl group-hover:bg-indigo-700 group-hover:scale-105 transition-all duration-300 shadow-md shadow-indigo-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                            </svg>
+                        </div>
+                        <span class="font-black text-2xl tracking-tight text-gray-900 mt-1">
+                            Tiket<span class="text-indigo-600">App</span>
+                        </span>
                     </a>
                 </div>
 
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
-                    </x-nav-link>
-
-                    @if(Auth::user()->role === 'user')
-                        <x-nav-link :href="route('my-tickets')" :active="request()->routeIs('my-tickets')">
-                            {{ __('Tiket Saya') }}
-                        </x-nav-link>
-                    @endif
-
-                    @if(Auth::user()->role === 'organizer')
-                        <x-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">
-                            {{ __('Validasi Scanner') }}
-                        </x-nav-link>
-                        <!-- TAMBAHAN REQUEST ASDOS: KELOLA KATEGORI -->
-                        <x-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.*')">
-                            {{ __('Kelola Kategori') }}
-                        </x-nav-link>
-                    @endif
 
                     @if(Auth::user()->role === 'admin')
-                        <x-nav-link :href="route('admin.users')" :active="request()->routeIs('admin.*')">
-                            {{ __('Kelola Pengguna') }}
+                        <x-nav-link :href="route('admin.users')" :active="request()->requestUri == '/admin/users'">
+                            👥 Kelola Pengguna
+                        </x-nav-link>
+
+                        <x-nav-link :href="route('admin.events')" :active="request()->routeIs('admin.events')">
+                            📅 Kelola Event
+                        </x-nav-link>
+
+                        <x-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.index')">
+                            🏷️ Kelola Kategori
+                        </x-nav-link>
+
+                    @elseif(Auth::user()->role === 'organizer')
+                        <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                            📊 Dashboard Panitia
+                        </x-nav-link>
+
+                        <x-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.index')">
+                            🏷️ Kelola Kategori
+                        </x-nav-link>
+
+                        <x-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.index')">
+                            📷 Scan Tiket
+                        </x-nav-link>
+
+                    @else
+                        <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                            🏠 Dashboard
+                        </x-nav-link>
+                        <x-nav-link :href="route('my-tickets')" :active="request()->routeIs('my-tickets')">
+                            🎟️ Tiket Saya
                         </x-nav-link>
                     @endif
+
                 </div>
             </div>
 
@@ -69,7 +88,6 @@
                 </x-dropdown>
             </div>
 
-            <!-- Tombol Hamburger Menu (Bila dibuka di HP) -->
             <div class="-me-2 flex items-center sm:hidden">
                 <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
@@ -97,7 +115,6 @@
                 <x-responsive-nav-link :href="route('scan.index')" :active="request()->routeIs('scan.*')">
                     {{ __('Validasi Scanner') }}
                 </x-responsive-nav-link>
-                <!-- TAMBAHAN RESPONSIVE: KELOLA KATEGORI -->
                 <x-responsive-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.*')">
                     {{ __('Kelola Kategori') }}
                 </x-responsive-nav-link>
