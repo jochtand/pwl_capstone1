@@ -14,6 +14,8 @@
         <!-- Scripts -->
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+        <link rel="icon" type="image/png" href="{{ asset('logo-tiket.png') }}">
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/40">

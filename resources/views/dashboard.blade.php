@@ -19,6 +19,12 @@
                         <p class="text-emerald-800 font-semibold tracking-wide">{{ session('success') }}</p>
                     </div>
                 @endif
+                    @if(session('error'))
+                        <div class="mb-8 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex items-center">
+                            <span class="text-red-500 text-2xl mr-3"></span>
+                            <p class="text-red-800 font-semibold tracking-wide">{{ session('error') }}</p>
+                        </div>
+                    @endif
 
                 @if(Auth::user()->role === 'organizer')
 
